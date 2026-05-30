@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Infinite Highway Crash - Fast Mode</title>
+    <title>Infinite Highway - Easy Mode</title>
     <style>
         body { margin: 0; background: #111; color: white; font-family: Arial, sans-serif; overflow: hidden; }
         #gameArea { position: relative; width: 100vw; height: 100vh; max-width: 500px; margin: 0 auto; background: #333; }
@@ -35,8 +35,8 @@
 
     let isPlaying = false;
     let score = 0;
-    // Increased base speed from 6 to 9
-    let speed = 9; 
+    // Lower base speed for easier gameplay
+    let speed = 5; 
     let roadY = 0;
     let moveLeft = false;
     let moveRight = false;
@@ -62,16 +62,17 @@
         npcs = [];
         particles = [];
         score = 0;
-        speed = 9; // Reset to faster speed
+        speed = 5;
         isPlaying = true;
         updateHealth();
         loop(); 
     }
 
     function spawnNPC() {
-        // Higher spawn frequency for faster gameplay
-        if (Math.random() < 0.05 + (score / 40000)) {
-            let lanes = [80, 160, 240, 320];
+        // Reduced spawn rate and added logic to allow spawning in middle lanes
+        if (Math.random() < 0.02 + (score / 100000)) {
+            // Lanes spread across the whole road width (80, 160, 240, 320)
+            let lanes = [80, 140, 200, 260, 320];
             let rx = lanes[Math.floor(Math.random() * lanes.length)];
             npcs.push({ x: rx, y: -100, w: 40, h: 80, color: ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6"][Math.floor(Math.random()*4)] });
         }
@@ -79,7 +80,7 @@
 
     function createCrash(x, y) {
         for(let i=0; i<10; i++) {
-            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, life: 1, size: Math.random() * 5 + 2 });
+            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, life: 1, size: Math.random() * 5 + 2 });
         }
     }
 
@@ -130,33 +131,32 @@
 
         if (!isPlaying) return;
 
-        // Increased acceleration
-        speed += 0.005;
+        speed += 0.001; // Slower difficulty ramp
         roadY += speed;
-        score += speed * 0.1;
+        score += speed * 0.05;
         scoreText.innerText = Math.floor(score);
 
-        // Responsive movement
-        if (moveLeft) player.vx -= 2;
-        if (moveRight) player.vx += 2;
+        if (moveLeft) player.vx -= 1.5;
+        if (moveRight) player.vx += 1.5;
         player.vx *= 0.8;
         player.x += player.vx;
 
-        if (player.x < 65) { player.x = 65; player.vx = 8; player.hp -= 4; updateHealth(); createCrash(player.x, player.y); }
-        if (player.x > canvas.width - 65) { player.x = canvas.width - 65; player.vx = -8; player.hp -= 4; updateHealth(); createCrash(player.x, player.y); }
+        if (player.x < 65) { player.x = 65; player.vx = 4; player.hp -= 2; updateHealth(); }
+        if (player.x > canvas.width - 65) { player.x = canvas.width - 65; player.vx = -4; player.hp -= 2; updateHealth(); }
 
         spawnNPC();
 
         for (let i = npcs.length - 1; i >= 0; i--) {
             let npc = npcs[i];
-            npc.y += speed - 2; 
+            npc.y += speed - 1; 
             drawCar(npc, false);
 
-            if (Math.abs(player.x - npc.x) < 38 && Math.abs(player.y - npc.y) < 75) {
-                player.hp -= 40;
+            // Slightly more forgiving collision detection
+            if (Math.abs(player.x - npc.x) < 32 && Math.abs(player.y - npc.y) < 70) {
+                player.hp -= 20; // Less damage per crash
                 updateHealth();
                 createCrash(player.x, player.y - 40);
-                player.vx = (player.x > npc.x) ? 20 : -20;
+                player.vx = (player.x > npc.x) ? 10 : -10;
                 npcs.splice(i, 1); 
                 if (player.hp <= 0) gameOver();
             } else if (npc.y > canvas.height + 100) {
