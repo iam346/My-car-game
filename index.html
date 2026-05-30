@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinite Highway Crash - Fast Mode</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: Arial, sans-serif; overflow: hidden; }
+        #gameArea { position: relative; width: 100vw; height: 100vh; max-width: 500px; margin: 0 auto; background: #333; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 15px; left: 15px; z-index: 10; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
+        #healthBar { width: 150px; height: 15px; background: #00ff00; border: 2px solid white; margin-top: 5px; }
+        .bigButton { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 28px; font-weight: bold; background: #ff3366; color: white; border: 4px solid white; border-radius: 10px; cursor: pointer; z-index: 9999; box-shadow: 0px 10px 20px rgba(0,0,0,0.8); display: none; }
+        .touchZone { position: absolute; top: 0; width: 50%; height: 100%; z-index: 5; }
+        #leftZone { left: 0; }
+        #rightZone { right: 0; }
+    </style>
+</head>
+<body>
+
+<div id="gameArea">
+    <div id="ui">Score: <span id="scoreText">0</span><div id="healthBar"></div></div>
+    <button id="restartBtn" class="bigButton" onclick="startGame()">TRY AGAIN</button>
+    <div id="leftZone" class="touchZone" onmousedown="steerLeft(true)" onmouseup="steerLeft(false)" onmouseleave="steerLeft(false)" ontouchstart="steerLeft(true)" ontouchend="steerLeft(false)" ontouchcancel="steerLeft(false)"></div>
+    <div id="rightZone" class="touchZone" onmousedown="steerRight(true)" onmouseup="steerRight(false)" onmouseleave="steerRight(false)" ontouchstart="steerRight(true)" ontouchend="steerRight(false)" ontouchcancel="steerRight(false)"></div>
+    <canvas id="c" width="400" height="700"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const restartBtn = document.getElementById("restartBtn");
+    const scoreText = document.getElementById("scoreText");
+    const healthBar = document.getElementById("healthBar");
+
+    let isPlaying = false;
+    let score = 0;
+    // Increased base speed from 6 to 9
+    let speed = 9; 
+    let roadY = 0;
+    let moveLeft = false;
+    let moveRight = false;
+    let player = { x: 200, y: 550, w: 40, h: 80, hp: 100, vx: 0 };
+    let npcs = [];
+    let particles = [];
+
+    function steerLeft(active) { moveLeft = active; }
+    function steerRight(active) { moveRight = active; }
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft" || e.key === "a") moveLeft = true;
+        if (e.key === "ArrowRight" || e.key === "d") moveRight = true;
+    });
+    window.addEventListener("keyup", (e) => {
+        if (e.key === "ArrowLeft" || e.key === "a") moveLeft = false;
+        if (e.key === "ArrowRight" || e.key === "d") moveRight = false;
+    });
+
+    function startGame() {
+        restartBtn.style.display = "none";
+        player = { x: 200, y: 550, w: 40, h: 80, hp: 100, vx: 0 };
+        npcs = [];
+        particles = [];
+        score = 0;
+        speed = 9; // Reset to faster speed
+        isPlaying = true;
+        updateHealth();
+        loop(); 
+    }
+
+    function spawnNPC() {
+        // Higher spawn frequency for faster gameplay
+        if (Math.random() < 0.05 + (score / 40000)) {
+            let lanes = [80, 160, 240, 320];
+            let rx = lanes[Math.floor(Math.random() * lanes.length)];
+            npcs.push({ x: rx, y: -100, w: 40, h: 80, color: ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6"][Math.floor(Math.random()*4)] });
+        }
+    }
+
+    function createCrash(x, y) {
+        for(let i=0; i<10; i++) {
+            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, life: 1, size: Math.random() * 5 + 2 });
+        }
+    }
+
+    function updateHealth() {
+        healthBar.style.width = Math.max(0, player.hp * 1.5) + "px";
+        if (player.hp > 50) healthBar.style.background = "#00ff00";
+        else if (player.hp > 25) healthBar.style.background = "#ffaa00";
+        else healthBar.style.background = "#ff0000";
+    }
+
+    function gameOver() {
+        isPlaying = false;
+        restartBtn.style.display = "block";
+        createCrash(player.x, player.y);
+    }
+
+    function drawCar(c, isPlayer) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(c.x - c.w/2 + 5, c.y - c.h/2 + 5, c.w, c.h);
+        ctx.fillStyle = isPlayer ? "#00ffff" : c.color;
+        ctx.fillRect(c.x - c.w/2, c.y - c.h/2, c.w, c.h);
+        ctx.fillStyle = "#111";
+        ctx.fillRect(c.x - c.w/2 + 4, c.y - c.h/2 + 15, c.w - 8, 15);
+        ctx.fillRect(c.x - c.w/2 + 5, c.y + c.h/2 - 20, c.w - 10, 10);
+        if (isPlayer) {
+            ctx.fillStyle = "#ffff99";
+            ctx.fillRect(c.x - c.w/2 + 4, c.y - c.h/2, 8, 5);
+            ctx.fillRect(c.x + c.w/2 - 12, c.y - c.h/2, 8, 5);
+        }
+    }
+
+    function loop() {
+        ctx.fillStyle = "#444";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#2d5a27";
+        ctx.fillRect(0, 0, 30, canvas.height);
+        ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
+
+        for (let i = -100; i < canvas.height + 100; i += 60) {
+            let y = (i + roadY) % (canvas.height + 60) - 60;
+            ctx.fillStyle = "white";
+            ctx.fillRect(130, y, 5, 30);
+            ctx.fillRect(265, y, 5, 30);
+            ctx.fillStyle = Math.floor((i + roadY) / 60) % 2 === 0 ? "#888" : "#cc2222";
+            ctx.fillRect(30, y, 15, 60);
+            ctx.fillRect(canvas.width - 45, y, 15, 60);
+        }
+
+        if (!isPlaying) return;
+
+        // Increased acceleration
+        speed += 0.005;
+        roadY += speed;
+        score += speed * 0.1;
+        scoreText.innerText = Math.floor(score);
+
+        // Responsive movement
+        if (moveLeft) player.vx -= 2;
+        if (moveRight) player.vx += 2;
+        player.vx *= 0.8;
+        player.x += player.vx;
+
+        if (player.x < 65) { player.x = 65; player.vx = 8; player.hp -= 4; updateHealth(); createCrash(player.x, player.y); }
+        if (player.x > canvas.width - 65) { player.x = canvas.width - 65; player.vx = -8; player.hp -= 4; updateHealth(); createCrash(player.x, player.y); }
+
+        spawnNPC();
+
+        for (let i = npcs.length - 1; i >= 0; i--) {
+            let npc = npcs[i];
+            npc.y += speed - 2; 
+            drawCar(npc, false);
+
+            if (Math.abs(player.x - npc.x) < 38 && Math.abs(player.y - npc.y) < 75) {
+                player.hp -= 40;
+                updateHealth();
+                createCrash(player.x, player.y - 40);
+                player.vx = (player.x > npc.x) ? 20 : -20;
+                npcs.splice(i, 1); 
+                if (player.hp <= 0) gameOver();
+            } else if (npc.y > canvas.height + 100) {
+                npcs.splice(i, 1);
+            }
+        }
+
+        drawCar(player, true);
+        particles = particles.filter(p => p.life > 0);
+        particles.forEach(p => { ctx.fillStyle = "#ffaa00"; ctx.globalAlpha = Math.max(0, p.life); ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); p.x += p.vx; p.y += p.vy; p.life -= 0.05; });
+        ctx.globalAlpha = 1.0;
+        requestAnimationFrame(loop);
+    }
+    startGame();
+</script>
+</body>
+</html>
