@@ -3,14 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Infinite Highway - Easy Mode</title>
+    <title>Infinite Highway - Map Select</title>
     <style>
         body { margin: 0; background: #111; color: white; font-family: Arial, sans-serif; overflow: hidden; }
         #gameArea { position: relative; width: 100vw; height: 100vh; max-width: 500px; margin: 0 auto; background: #333; }
         canvas { display: block; width: 100%; height: 100%; }
         #ui { position: absolute; top: 15px; left: 15px; z-index: 10; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
         #healthBar { width: 150px; height: 15px; background: #00ff00; border: 2px solid white; margin-top: 5px; }
-        .bigButton { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 28px; font-weight: bold; background: #ff3366; color: white; border: 4px solid white; border-radius: 10px; cursor: pointer; z-index: 9999; box-shadow: 0px 10px 20px rgba(0,0,0,0.8); display: none; }
+        
+        /* Menu overlay styling */
+        .menuOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .menuTitle { font-size: 32px; font-weight: bold; color: #fff; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .menuBtn { width: 220px; padding: 15px; margin: 10px; font-size: 22px; font-weight: bold; color: white; border: 3px solid white; border-radius: 12px; cursor: pointer; transition: 0.2s; box-shadow: 0px 5px 15px rgba(0,0,0,0.3); }
+        
+        /* Map button custom colors */
+        #btnHighway { background: #555555; }
+        #btnBeach { background: #f1c40f; color: #2c3e50; border-color: #2c3e50; }
+        #btnForest { background: #27ae60; }
+
         .touchZone { position: absolute; top: 0; width: 50%; height: 100%; z-index: 5; }
         #leftZone { left: 0; }
         #rightZone { right: 0; }
@@ -20,7 +30,14 @@
 
 <div id="gameArea">
     <div id="ui">Score: <span id="scoreText">0</span><div id="healthBar"></div></div>
-    <button id="restartBtn" class="bigButton" onclick="startGame()">TRY AGAIN</button>
+    
+    <div id="mapMenu" class="menuOverlay">
+        <div class="menuTitle" id="menuHeader">CHOOSE YOUR MAP</div>
+        <button id="btnHighway" class="menuBtn" onclick="selectMap('highway')">Highway 🛣️</button>
+        <button id="btnBeach" class="menuBtn" onclick="selectMap('beach')">Beach Coast 🏖️</button>
+        <button id="btnForest" class="menuBtn" onclick="selectMap('forest')">Forest Trail 🌲</button>
+    </div>
+
     <div id="leftZone" class="touchZone" onmousedown="steerLeft(true)" onmouseup="steerLeft(false)" onmouseleave="steerLeft(false)" ontouchstart="steerLeft(true)" ontouchend="steerLeft(false)" ontouchcancel="steerLeft(false)"></div>
     <div id="rightZone" class="touchZone" onmousedown="steerRight(true)" onmouseup="steerRight(false)" onmouseleave="steerRight(false)" ontouchstart="steerRight(true)" ontouchend="steerRight(false)" ontouchcancel="steerRight(false)"></div>
     <canvas id="c" width="400" height="700"></canvas>
@@ -29,13 +46,13 @@
 <script>
     const canvas = document.getElementById("c");
     const ctx = canvas.getContext("2d");
-    const restartBtn = document.getElementById("restartBtn");
+    const mapMenu = document.getElementById("mapMenu");
+    const menuHeader = document.getElementById("menuHeader");
     const scoreText = document.getElementById("scoreText");
     const healthBar = document.getElementById("healthBar");
 
     let isPlaying = false;
     let score = 0;
-    // Lower base speed for easier gameplay
     let speed = 5; 
     let roadY = 0;
     let moveLeft = false;
@@ -43,6 +60,14 @@
     let player = { x: 200, y: 550, w: 40, h: 80, hp: 100, vx: 0 };
     let npcs = [];
     let particles = [];
+    
+    // Map theme settings
+    let currentMap = 'highway';
+    const mapThemes = {
+        highway: { road: "#444444", side: "#2d5a27", line: "white", curbA: "#888888", curbB: "#cc2222" },
+        beach: { road: "#2c3e50", side: "#f39c12", line: "#ffffff", curbA: "#f1c40f", curbB: "#e67e22" },
+        forest: { road: "#3e2723", side: "#1b5e20", line: "#e0e0e0", curbA: "#4e342e", curbB: "#2e7d32" }
+    };
 
     function steerLeft(active) { moveLeft = active; }
     function steerRight(active) { moveRight = active; }
@@ -56,8 +81,13 @@
         if (e.key === "ArrowRight" || e.key === "d") moveRight = false;
     });
 
+    function selectMap(mapType) {
+        currentMap = mapType;
+        mapMenu.style.display = "none";
+        startGame();
+    }
+
     function startGame() {
-        restartBtn.style.display = "none";
         player = { x: 200, y: 550, w: 40, h: 80, hp: 100, vx: 0 };
         npcs = [];
         particles = [];
@@ -69,9 +99,7 @@
     }
 
     function spawnNPC() {
-        // Reduced spawn rate and added logic to allow spawning in middle lanes
         if (Math.random() < 0.02 + (score / 100000)) {
-            // Lanes spread across the whole road width (80, 160, 240, 320)
             let lanes = [80, 140, 200, 260, 320];
             let rx = lanes[Math.floor(Math.random() * lanes.length)];
             npcs.push({ x: rx, y: -100, w: 40, h: 80, color: ["#e74c3c", "#3498db", "#f1c40f", "#9b59b6"][Math.floor(Math.random()*4)] });
@@ -79,8 +107,8 @@
     }
 
     function createCrash(x, y) {
-        for(let i=0; i<10; i++) {
-            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, life: 1, size: Math.random() * 5 + 2 });
+        for(let i=0; i<15; i++) {
+            particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 1, size: Math.random() * 5 + 2 });
         }
     }
 
@@ -93,12 +121,17 @@
 
     function gameOver() {
         isPlaying = false;
-        restartBtn.style.display = "block";
         createCrash(player.x, player.y);
+        
+        // Show menu again with a game over title
+        setTimeout(() => {
+            menuHeader.innerText = "GAME OVER! CHOOSE NEXT MAP";
+            mapMenu.style.display = "flex";
+        }, 1000);
     }
 
     function drawCar(c, isPlayer) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
         ctx.fillRect(c.x - c.w/2 + 5, c.y - c.h/2 + 5, c.w, c.h);
         ctx.fillStyle = isPlayer ? "#00ffff" : c.color;
         ctx.fillRect(c.x - c.w/2, c.y - c.h/2, c.w, c.h);
@@ -113,25 +146,41 @@
     }
 
     function loop() {
-        ctx.fillStyle = "#444";
+        let theme = mapThemes[currentMap];
+        
+        // Base road color
+        ctx.fillStyle = theme.road;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#2d5a27";
+        
+        // Road sides/background
+        ctx.fillStyle = theme.side;
         ctx.fillRect(0, 0, 30, canvas.height);
         ctx.fillRect(canvas.width - 30, 0, 30, canvas.height);
 
+        // Moving environment lines/curbs
         for (let i = -100; i < canvas.height + 100; i += 60) {
             let y = (i + roadY) % (canvas.height + 60) - 60;
-            ctx.fillStyle = "white";
+            
+            // Lane Dividers
+            ctx.fillStyle = theme.line;
             ctx.fillRect(130, y, 5, 30);
             ctx.fillRect(265, y, 5, 30);
-            ctx.fillStyle = Math.floor((i + roadY) / 60) % 2 === 0 ? "#888" : "#cc2222";
+            
+            // Curbs
+            ctx.fillStyle = Math.floor((i + roadY) / 60) % 2 === 0 ? theme.curbA : theme.curbB;
             ctx.fillRect(30, y, 15, 60);
             ctx.fillRect(canvas.width - 45, y, 15, 60);
         }
 
-        if (!isPlaying) return;
+        if (!isPlaying) {
+            // Keep rendering particles and cars even if dead
+            npcs.forEach(n => drawCar(n, false));
+            drawCar(player, true);
+            particles.forEach(p => { ctx.fillStyle = "#ff5500"; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); });
+            return;
+        }
 
-        speed += 0.001; // Slower difficulty ramp
+        speed += 0.001; 
         roadY += speed;
         score += speed * 0.05;
         scoreText.innerText = Math.floor(score);
@@ -141,8 +190,8 @@
         player.vx *= 0.8;
         player.x += player.vx;
 
-        if (player.x < 65) { player.x = 65; player.vx = 4; player.hp -= 2; updateHealth(); }
-        if (player.x > canvas.width - 65) { player.x = canvas.width - 65; player.vx = -4; player.hp -= 2; updateHealth(); }
+        if (player.x < 65) { player.x = 65; player.vx = 4; player.hp -= 2; updateHealth(); if(player.hp <= 0) gameOver(); }
+        if (player.x > canvas.width - 65) { player.x = canvas.width - 65; player.vx = -4; player.hp -= 2; updateHealth(); if(player.hp <= 0) gameOver(); }
 
         spawnNPC();
 
@@ -151,9 +200,8 @@
             npc.y += speed - 1; 
             drawCar(npc, false);
 
-            // Slightly more forgiving collision detection
             if (Math.abs(player.x - npc.x) < 32 && Math.abs(player.y - npc.y) < 70) {
-                player.hp -= 20; // Less damage per crash
+                player.hp -= 20; 
                 updateHealth();
                 createCrash(player.x, player.y - 40);
                 player.vx = (player.x > npc.x) ? 10 : -10;
@@ -168,9 +216,9 @@
         particles = particles.filter(p => p.life > 0);
         particles.forEach(p => { ctx.fillStyle = "#ffaa00"; ctx.globalAlpha = Math.max(0, p.life); ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); p.x += p.vx; p.y += p.vy; p.life -= 0.05; });
         ctx.globalAlpha = 1.0;
+        
         requestAnimationFrame(loop);
     }
-    startGame();
 </script>
 </body>
 </html>
